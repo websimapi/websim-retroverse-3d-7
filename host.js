@@ -35,39 +35,15 @@ export async function initHost(room, dataDisplayEl) {
     subscribeToGameState(room, (state) => {
         if (state) {
             dataDisplayEl.textContent = JSON.stringify(state, null, 2);
+            // Ensure our in-memory state reflects the database, to prevent overwriting with stale data.
+            // We merge instead of replace to handle local updates that haven't been persisted yet.
+            if(state.slot_1) {
+                Object.assign(playersData, state.slot_1);
+            }
         } else {
             dataDisplayEl.textContent = "Waiting for game state...";
         }
     });
-
-    function cleanDisconnectedPlayers() {
-        const connectedPeerUserIds = new Set();
-        for (const clientId in room.peers) {
-            const peer = room.peers[clientId];
-            if (peer && peer.userId) {
-                connectedPeerUserIds.add(peer.userId);
-            }
-        }
-        connectedPeerUserIds.add(hostUserId); // Host is always connected
-        
-        let updated = false;
-        for (const userId in playersData) {
-            if (!connectedPeerUserIds.has(userId)) {
-                console.log(`Player ${playersData[userId]?.username} (${userId}) disconnected. Removing from data.`);
-                delete playersData[userId];
-                updated = true;
-            }
-        }
-        if (updated) {
-            updatePlayersData(room, recordId, playersData);
-        }
-    }
-    
-    room.subscribePresence(() => {
-        cleanDisconnectedPlayers();
-    });
-    cleanDisconnectedPlayers();
-
 
     // Main update loop for host
     setInterval(() => {
